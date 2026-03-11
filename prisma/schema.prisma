@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CandidateStatus {
+  NEW
+  CONTACTED
+  INTERVIEW
+  REJECTED
+  HIRED
+}
+
+enum QuestionType {
+  TEXT
+  NUMBER
+  PHONE
+  CHOICE
+  YES_NO
+}
+
+model AdminUser {
+  id         String   @id @default(cuid())
+  telegramId BigInt   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Vacancy {
+  id           String            @id @default(cuid())
+  title        String
+  slug         String            @unique
+  description  String
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  questions    VacancyQuestion[]
+  applications Application[]
+}
+
+model VacancyQuestion {
+  id         String       @id @default(cuid())
+  vacancyId  String
+  order      Int
+  key        String
+  question   String
+  type       QuestionType @default(TEXT)
+  isRequired Boolean      @default(true)
+  placeholder String?
+  optionsJson Json?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  vacancy    Vacancy      @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  answers    ApplicationAnswer[]
+
+  @@unique([vacancyId, order])
+  @@unique([vacancyId, key])
+  @@index([vacancyId])
+}
+
+model Application {
+  id            String                 @id @default(cuid())
+  telegramId    BigInt
+  fullName      String?
+  username      String?
+  phone         String?
+  vacancyId     String
+  status        CandidateStatus        @default(NEW)
+  submittedAt   DateTime               @default(now())
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  vacancy       Vacancy                @relation(fields: [vacancyId], references: [id], onDelete: Restrict)
+  answers       ApplicationAnswer[]
+  notes         ApplicationNote[]
+  statusHistory ApplicationStatusLog[]
+
+  @@index([vacancyId])
+  @@index([telegramId])
+  @@index([status])
+}
+
+model ApplicationAnswer {
+  id            String          @id @default(cuid())
+  applicationId String
+  questionId    String
+  answerText    String
+  createdAt     DateTime        @default(now())
+  application   Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  question      VacancyQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId])
+  @@index([questionId])
+}
+
+model CandidateSession {
+  id                     String   @id @default(cuid())
+  telegramId             BigInt   @unique
+  mode                   String?
+  step                   String?
+  selectedVacancyId      String?
+  currentQuestionIndex   Int      @default(0)
+  currentScreenMessageId Int?
+  lastUserMessageId      Int?
+  draftData              Json?
+  isCompleted            Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model ApplicationNote {
+  id            String      @id @default(cuid())
+  applicationId String
+  adminTelegram BigInt
+  note          String
+  createdAt     DateTime    @default(now())
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+model ApplicationStatusLog {
+  id            String          @id @default(cuid())
+  applicationId String
+  fromStatus    CandidateStatus
+  toStatus      CandidateStatus
+  changedBy     BigInt
+  createdAt     DateTime        @default(now())
+  application   Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
